@@ -12,146 +12,445 @@
 {library(tidyverse)
 }
 
-# Loading data from ETP sites ---------------------------------------------
+#Note - remove record_duration from MaxN, then add at the end from SiteInfo
+
+# Loading MaxN data from ETP sites ---------------------------------------------
 
 #Load MaxN data from sites and remove unnecessary columns
 
+#Malpelo 2015
 Malpelo15_MaxN <- openxlsx::read.xlsx("Data/Malpelo_2015_MaxN.xlsx") %>% 
-  select(-c(1:5, 7, 12:13, 15, 21, 23)) %>% 
+  select(-c(1:5, 7:9, 12:17, 21, 23)) %>% 
   #Rename columns with . in name
-  rename("Depth_ft" = "Depth.(ft)", 
-         "BRUVS_type" = "Bottom/Pelagic",
-         "Record_duration" = "Record.duration",
-         "Bottom_type" = "Bottom.type") %>% 
+  rename("BRUVS_type" = "Bottom/Pelagic",
+         "Replicate" = "OpCode") %>% 
   #Remove ? in site names
   mutate(Site = recode(Site, 
                        "Tres Mosqueteros?" = "Tres Mosqueteros")) %>% 
-  #Recode BRUV_type to remove !
-  mutate(BRUVS_type = recode(BRUVS_type, 
-                             "Bottom!!!" = "Bottom")) %>% 
-  #Recode record_duration time to min
-  mutate(Record_duration = recode(Record_duration, 
-                                  "1.3" = 90, 
-                                  "1.30.00" = 90)) %>% 
-  #Depth from feet to meters
-  mutate(Depth = Depth_ft/3.2808) %>% 
-  select(-Depth_ft) %>% 
+  #Keep only sites with bottom BRUVS (Bottom or Bottom!!!), removing pelagic BRUVS
+  filter(BRUVS_type == "Bottom" | BRUVS_type == "Bottom!!!") %>% 
+  #Drop column with BRUVS_type
+  select(-c("BRUVS_type")) %>% 
   #Adding column for Island
-  mutate(Location = "Malpelo15")
+  mutate(Location = "Malpelo")
 
+#Malpelo 2018
 Malpelo18_MaxN <- openxlsx::read.xlsx("Data/Malpelo_2018_MaxN.xlsx") %>% 
-  select(-c(1:5, 7, 12:13, 15, 21, 23)) %>% 
+  select(-c(1:5, 7:9, 12:17, 21, 23)) %>% 
   #Rename columns with . in name
   rename("BRUVS_type" = "Bottom/Pelagic",
-         "Record_duration" = "Record.Duration",
-         "Bottom_type" = "Bottom.type") %>% 
-  #Recode site name NA to Pared Naufrago
+         "Replicate" = "OpCode") %>% 
+  #Recode site name NA to Pared Naufrago (because they are in the wrong column)
   mutate(Site = replace_na(Site, "Pared Naufrago")) %>% 
-  #Remove site name from BRUVS_type column 
-  mutate(BRUVS_type = na_if(BRUVS_type, "Pared Naufrago")) %>% 
-  #Recode record_duration time to minutes
-  mutate(Record_duration = recode(Record_duration, 
-                                  "0.0625" = 90)) %>% 
+  #Remove BRUVS_type as the only data was the site name which was wrong
+  select(-c("BRUVS_type")) %>%
   #Adding column for Island
-  mutate(Location = "Malpelo18")
+  mutate(Location = "Malpelo")
 
-Revillagigedo16_MaxN <- openxlsx::read.xlsx("Data/Revillagigedo_2016_MaxN.xlsx") %>% 
-  select(-c(1:5, 7, 12:13, 15, 21, 23)) %>% 
-  #Site names are not unique, therefore Opcode is used instead
-  mutate(Site = OpCode) %>% #Question - can be changed when site names are updated
+#Revillagigedo 2016
+Revilla16_MaxN <- openxlsx::read.xlsx("Data/Revillagigedo_2016_MaxN.xlsx") %>% 
+  select(-c(1:5, 7:10, 12:17, 21, 23)) %>% 
   #Rename columns with . in name
-  rename("BRUVS_type" = "Bottom/Pelagic",
-         "Record_duration" = "Record.duration",
-         "Bottom_type" = "Bottom.type") %>% 
-  #Recode record_duration time to min
-  mutate(Record_duration = recode(Record_duration, 
-                                  "1.30.00" = 90, 
-                                  "1.10.00" = 70, 
-                                  "1.30.00`" = 90, 
-                                  "01.30.00" = 90)) %>% 
+  rename("Replicate" = "OpCode") %>% 
   #Adding column for Island
-  mutate(Location = "Revillagigedo")
+  mutate(Location = "Revilla")
+  
+#Clipperton 2016
+Clip16_MaxN <- openxlsx::read.xlsx("Data/Clipperton_2016_MaxN.xlsx") %>% 
+  select(-c(1:5, 7, 11, 13)) %>%
+  #Adding column for Location
+  mutate(Location = "Clip") %>% 
+  #Rename OpCode to replicates, because it is the unique replicate name
+  rename("Replicate" = "OpCode") %>% 
+  #Adding column for site - Question can be changed when missing site is figured out
+  mutate(Site = NA)
 
-#Load MaxN data from sites and remove unnecessary columns
 
+#Parque Nacional Machalilla
+PNM19_MaxN <- openxlsx::read.xlsx("Data/Machalilla_2019_MaxN.xlsx") %>% 
+  select(-c(1:5, 7, 11, 13)) %>%
+  #Adding column for Location
+  mutate(Location = "PNM") %>% 
+  #Rename OpCode to replicates, because it is the unique replicate name
+  rename("Replicate" = "OpCode") %>% 
+  #Adding column for site - Question can be changed when missing site is figured out
+  mutate(Site = NA) %>% 
+  #Remove replicates with too bad visibility (cannot see bait canister)
+  filter(! (Replicate == "PNM15_P4_20190409" | Replicate == "PNM21_P1_20190509"))
+
+#Galera San Francisco Marine Reserve
+GSF19_MaxN <- openxlsx::read.xlsx("Data/GSF_2019_MaxN.xlsx") %>% 
+  select(-c(1:5, 7, 11, 13)) %>%
+  #Adding column for Location
+  mutate(Location = "GSF") %>% 
+  #Rename OpCode to replicates, because it is the unique replicate name
+  rename("Replicate" = "OpCode") %>% 
+  #Adding column for site - Question can be changed when missing site is figured out
+  mutate(Site = NA) %>% 
+  #Remove replicates with too bad visibility (cannot see bait canister)
+  filter(! (Replicate == "GSF7repeat_P1_20190831" | Replicate == "GSF11_P4_20190829"))
+
+#Caño Island
+Cano19_MaxN <- openxlsx::read.xlsx("Data/Cano_2019_MaxN.xlsx") %>% 
+  select(-c(1:5, 7, 11, 13)) %>%
+  #Adding column for Location
+  mutate(Location = "Cano") %>% 
+  #Rename OpCode to replicates, because it is the unique replicate name
+  rename("Replicate" = "OpCode") %>% 
+  #Adding column for site - Question can be changed when missing site is figured out
+  mutate(Site = NA) %>% 
+  #Recoding wrongly named replicates
+  mutate(Replicate = recode(Replicate, 
+                            "IC6200319B2-2" = "IC6200319B2", 
+                            "IC4180319B2-2" = "IC4180319B2", 
+                            "IC5190319B2-2" = "IC5190319B2"))
+
+#Darwin Island, Galapagos Marine Reserve
+Darwin16_MaxN <- openxlsx::read.xlsx("Data/Darwin_2016_MaxN.xlsx") %>% 
+  select(-c(1:5, 7:9, 12:17, 21, 23)) %>%
+  #Adding column for Location
+  mutate(Location = "GMR") %>% 
+  #Rename OpCode to replicates, because it is the unique replicate name
+  rename("Replicate" = "OpCode") %>% 
+  #Removing pelagic BRUVS
+  filter(`Bottom/Pelagic` == "Bottom" | `Bottom/Pelagic` == "B") %>% 
+  #Remove column Bottom/Pelagic
+  select(-`Bottom/Pelagic`)
+
+#Darwin Island, Galapagos Marine Reserve
+Wolf16_MaxN <- openxlsx::read.xlsx("Data/Wolf_2016_MaxN.xlsx") %>% 
+  select(-c(1:5, 7:9, 12:17, 21, 23)) %>%
+  #Adding column for Location
+  mutate(Location = "GMR") %>% 
+  #Rename OpCode to replicates, because it is the unique replicate name
+  rename("Replicate" = "OpCode") %>% 
+  #Removing pelagic BRUVS
+  filter(`Bottom/Pelagic` == "Bottom" | `Bottom/Pelagic` == "B") %>%
+  #Remove column Bottom/Pelagic
+  select(-`Bottom/Pelagic`)
+
+#Darwin Island, Galapagos Marine Reserve
+Darwin17_MaxN <- openxlsx::read.xlsx("Data/Darwin_2017_MaxN.xlsx") %>% 
+  select(-c(1:5, 7:9, 12:16, 20, 22)) %>%
+  #Adding column for Location
+  mutate(Location = "GMR") %>% 
+  #Rename OpCode to replicates, because it is the unique replicate name
+  rename("Replicate" = "OpCode") %>% 
+  #Removing pelagic BRUVS
+  filter(`Bottom/Pelagic` == "Bottom") %>% 
+  #Remove column Bottom/Pelagic
+  select(-`Bottom/Pelagic`)
+
+#Darwin Island, Galapagos Marine Reserve
+Wolf17_MaxN <- openxlsx::read.xlsx("Data/Wolf_2017_MaxN.xlsx") %>% 
+  select(-c(1:5, 7:9, 12:17, 21, 23)) %>%
+  #Adding column for Location
+  mutate(Location = "GMR") %>% 
+  #Rename OpCode to replicates, because it is the unique replicate name
+  rename("Replicate" = "OpCode") %>% 
+  #Removing pelagic BRUVS
+  filter(`Bottom/Pelagic` == "Bottom") %>%
+  #Remove column Bottom/Pelagic
+  select(-`Bottom/Pelagic`)
+
+
+# Loading Length data from ETP sites ---------------------------------------------
+
+#Load Length data from sites and remove unnecessary columns
+
+#Malpelo 2015
 Malpelo15_Length <- openxlsx::read.xlsx("Data/Malpelo_2015_Length.xlsx") %>% 
-  select(-c(1:5, 10:15, 17, 22:23, 25, 31, 33:35)) %>% 
+  select(-c(1:5, 10:15, 17:19, 22:24, 25:27, 31, 33:35)) %>% 
   #Rename columns with . in name
   rename("Length_mm" = "Length.(mm)", 
          "Precision_mm" = "Precision.(mm)", 
          "RMS_mm" = "RMS.(mm)", 
          "Range_mm" = "Range.(mm)", 
-         "Depth_ft" = "Depth", 
-         "BRUVS_type" = "Bottom/Pelagic",
-         "Record_duration" = "Record.duration",
-         "Bottom_type" = "Bottom.type") %>%
+         "BRUVS_type" = "Bottom/Pelagic", 
+         "Replicate" = "OpCode") %>%
   #Remove ? in site names
   mutate(Site = recode(Site, 
                        "Tres Mosqueteros?" = "Tres Mosqueteros")) %>%
-  #Recode record_duration time to minutes
-  mutate(Record_duration = recode(Record_duration, 
-                                  "1.3" = 90, 
-                                  "1.30.00" = 90)) %>% 
-  #Depth from feet to meters
-  mutate(Depth = Depth_ft/3.2808) %>% 
-  select(-Depth_ft) %>% 
+  #Keep only sites with bottom BRUVS (Bottom or Bottom!!!), removing pelagic BRUVS
+  filter(BRUVS_type == "Bottom" | BRUVS_type == "Bottom!!!") %>% 
+  #Drop column with BRUVS_type
+  select(-c("BRUVS_type")) %>%
   #Adding column for Island
-  mutate(Location = "Malpelo15")
+  mutate(Location = "Malpelo")
 
+#Malpelo 2018
 Malpelo18_Length <- openxlsx::read.xlsx("Data/Malpelo_2018_Length.xlsx") %>% 
-  select(-c(1:5, 10:15, 17, 22:23, 25, 31, 33:35)) %>% 
+  select(-c(1:5, 10:15, 17:19, 22:24, 25:27, 31, 33:35)) %>% 
   #Rename columns with . in name
   rename("Length_mm" = "Length.(mm)", 
          "Precision_mm" = "Precision.(mm)", 
          "RMS_mm" = "RMS.(mm)", 
          "Range_mm" = "Range.(mm)",
-         "BRUVS_type" = "Bottom/Pelagic",
-         "Record_duration" = "Record.Duration",
-         "Bottom_type" = "Bottom.type") %>% 
-  #Recode site name NA to Pared Naufrago
+         "BRUVS_type" = "Bottom/Pelagic", 
+         "Replicate" = "OpCode") %>% 
+  #Recode site name NA to Pared Naufrago (because they are in the wrong column)
   mutate(Site = replace_na(Site, "Pared Naufrago")) %>% 
-  #Remove site name from BRUVS_type column 
-  mutate(BRUVS_type = na_if(BRUVS_type, "Pared Naufrago")) %>% 
+  #Remove BRUVS_type as the only data was the site name which was wrong
+  select(-c("BRUVS_type")) %>% 
   #Adding column for Island
-  mutate(Location = "Malpelo18")
+  mutate(Location = "Malpelo")
 
-Revillagigedo16_Length <- openxlsx::read.xlsx("Data/Revillagigedo_2016_Length.xlsx") %>% 
-  select(-c(1:5, 10:15, 17, 22:23, 25, 31, 33:37)) %>% 
-  #Site names are not unique, therefore Opcode is used instead
-  mutate(Site = OpCode) %>% #Question - can be changed when site names are updated
+#Revillagigedo 2016
+Revilla16_Length <- openxlsx::read.xlsx("Data/Revillagigedo_2016_Length.xlsx") %>% 
+  select(-c(1:5, 10:15, 17:20, 22:24, 25:27, 31, 33:37)) %>% 
   #Rename columns with . in name
   rename("Length_mm" = "Length.(mm)", 
          "Precision_mm" = "Precision.(mm)", 
          "RMS_mm" = "RMS.(mm)", 
-         "Range_mm" = "Range.(mm)",
-         "BRUVS_type" = "Bottom/Pelagic",
-         "Record_duration" = "Record.duration",
-         "Bottom_type" = "Bottom.type") %>% 
-  #Recode record_duration time to min
-  mutate(Record_duration = recode(Record_duration, 
-                                  "1.30.00" = 90, 
-                                  "1.10.00" = 70, 
-                                  "1.30.00`" = 90, 
-                                  "01.30.00" = 90)) %>% 
+         "Range_mm" = "Range.(mm)", 
+         "Replicate" = "OpCode") %>% 
   #Adding column for Island
-  mutate(Location = "Revillagigedo")
+  mutate(Location = "Revilla")
 
-#Access to the Fish data set with correct names and a/b variables to calculate biomass
-FishDB <- read_csv("https://raw.githubusercontent.com/lidefi87/MangroveProject_CDF/master/Data/FishDB.csv")
-#Database updated in January 2021
+#Clipperton 2016
+Clip16_Length <- openxlsx::read.xlsx("Data/Clipperton_2016_Length.xlsx") %>% 
+  select(-c(1:5, 10:15, 17, 21, 23:25)) %>% 
+  #Rename columns with . in name
+  rename("Length_mm" = "Length.(mm)", 
+         "Precision_mm" = "Precision.(mm)", 
+         "RMS_mm" = "RMS.(mm)", 
+         "Range_mm" = "Range.(mm)", 
+         "Replicate" = "OpCode") %>% 
+  #Adding column for Island
+  mutate(Location = "Clip") %>% 
+  #Adding column for site - Question can be changed when missing site is figured out
+  mutate(Site = NA)
+
+#Parque Nacional Machalilla
+PNM19_Length <- openxlsx::read.xlsx("Data/Machalilla_2019_Length.xlsx") %>% 
+  select(-c(1:5, 10:15, 17, 21, 23:25)) %>% 
+  #Rename columns with . in name
+  rename("Length_mm" = "Length.(mm)", 
+         "Precision_mm" = "Precision.(mm)", 
+         "RMS_mm" = "RMS.(mm)", 
+         "Range_mm" = "Range.(mm)", 
+         "Replicate" = "OpCode") %>% 
+  #Adding column for Island
+  mutate(Location = "PNM") %>% 
+  #Adding column for site - Question can be changed when missing site is figured out
+  mutate(Site = NA) %>% 
+  #Remove replicates with too bad visibility (cannot see bait canister)
+  filter(! (Replicate == "PNM15_P4_20190409" | Replicate == "PNM21_P1_20190509"))
+
+##Galera San Francisco Marine Reserve
+GSF19_Length <- openxlsx::read.xlsx("Data/GSF_2019_Length.xlsx") %>% 
+  select(-c(1:5, 10:15, 17, 21, 23:25)) %>% 
+  #Rename columns with . in name
+  rename("Length_mm" = "Length.(mm)", 
+         "Precision_mm" = "Precision.(mm)", 
+         "RMS_mm" = "RMS.(mm)", 
+         "Range_mm" = "Range.(mm)", 
+         "Replicate" = "OpCode") %>% 
+  #Adding column for Island
+  mutate(Location = "GSF") %>% 
+  #Adding column for site - Question can be changed when missing site is figured out
+  mutate(Site = NA) %>% 
+  #Remove replicates with too bad visibility (cannot see bait canister)
+  filter(! (Replicate == "GSF7repeat_P1_20190831" | Replicate == "GSF11_P4_20190829"))
+
+##Caño Island
+Cano19_Length <- openxlsx::read.xlsx("Data/Cano_2019_Length.xlsx") %>% 
+  select(-c(1:5, 10:15, 17, 21, 23:25)) %>% 
+  #Rename columns with . in name
+  rename("Length_mm" = "Length.(mm)", 
+         "Precision_mm" = "Precision.(mm)", 
+         "RMS_mm" = "RMS.(mm)", 
+         "Range_mm" = "Range.(mm)", 
+         "Replicate" = "OpCode") %>% 
+  #Adding column for Island
+  mutate(Location = "Cano") %>% 
+  #Adding column for site - Question can be changed when missing site is figured out
+  mutate(Site = NA)
+
+##Darwin Island, Galapagos Marine Reserve
+Darwin16_Length <- openxlsx::read.xlsx("Data/Darwin_2016_Length.xlsx") %>% 
+  select(-c(1:5, 10:15, 17:19, 22:27, 31, 33:37)) %>% 
+  #Rename columns with . in name
+  rename("Length_mm" = "Length.(mm)", 
+         "Precision_mm" = "Precision.(mm)", 
+         "RMS_mm" = "RMS.(mm)", 
+         "Range_mm" = "Range.(mm)", 
+         "Replicate" = "OpCode") %>% 
+  #Adding column for Island
+  mutate(Location = "GMR") %>% 
+  #Removing pelagic BRUVS
+  filter(`Bottom/Pelagic` == "Bottom") %>%
+  #Remove column Bottom/Pelagic
+  select(-`Bottom/Pelagic`)
+
+##Wolf Island, Galapagos Marine Reserve
+Wolf16_Length <- openxlsx::read.xlsx("Data/Wolf_2016_Length.xlsx") %>% 
+  select(-c(1:5, 10:15, 17:19, 22:27, 31, 33:37)) %>% 
+  #Rename columns with . in name
+  rename("Length_mm" = "Length.(mm)", 
+         "Precision_mm" = "Precision.(mm)", 
+         "RMS_mm" = "RMS.(mm)", 
+         "Range_mm" = "Range.(mm)", 
+         "Replicate" = "OpCode") %>% 
+  #Adding column for Island
+  mutate(Location = "GMR") %>% 
+  #Removing pelagic BRUVS
+  filter(`Bottom/Pelagic` == "Bottom") %>%
+  #Remove column Bottom/Pelagic
+  select(-`Bottom/Pelagic`)
+
+##Darwin Island, Galapagos Marine Reserve
+Darwin17_Length <- openxlsx::read.xlsx("Data/Darwin_2017_Length.xlsx") %>% 
+  select(-c(1:5, 10:15, 17:19, 22:26, 30, 32:34)) %>% 
+  #Rename columns with . in name
+  rename("Length_mm" = "Length.(mm)", 
+         "Precision_mm" = "Precision.(mm)", 
+         "RMS_mm" = "RMS.(mm)", 
+         "Range_mm" = "Range.(mm)", 
+         "Replicate" = "OpCode") %>% 
+  #Adding column for Island
+  mutate(Location = "GMR") %>% 
+  #Removing pelagic BRUVS
+  filter(`Bottom/Pelagic` == "Bottom") %>%
+  #Remove column Bottom/Pelagic
+  select(-`Bottom/Pelagic`)
+
+##Wolf Island, Galapagos Marine Reserve
+Wolf17_Length <- openxlsx::read.xlsx("Data/Wolf_2017_Length.xlsx") %>% 
+  select(-c(1:5, 10:15, 17:19, 22:27, 31, 33:35)) %>% 
+  #Rename columns with . in name
+  rename("Length_mm" = "Length.(mm)", 
+         "Precision_mm" = "Precision.(mm)", 
+         "RMS_mm" = "RMS.(mm)", 
+         "Range_mm" = "Range.(mm)", 
+         "Replicate" = "OpCode") %>% 
+  #Adding column for Island
+  mutate(Location = "GMR") %>% 
+  #Removing pelagic BRUVS
+  filter(`Bottom/Pelagic` == "Bottom") %>%
+  #Remove column Bottom/Pelagic
+  select(-`Bottom/Pelagic`)
+
+
+# Adding missing individuals ----------------------------------------------
+
+#Checking for species only in length and not in MaxN
+Malpelo15_Length %>% select(Family, Genus, Species) %>% unique() %>% 
+  anti_join(Malpelo15_MaxN %>% select(Family, Genus, Species) %>% unique()) %>% 
+  filter(! is.na(Species)) %>% filter(! Species == "sp")
+
+Malpelo18_Length %>% select(Family, Genus, Species) %>% unique() %>% 
+  anti_join(Malpelo18_MaxN %>% select(Family, Genus, Species) %>% unique()) %>% 
+  filter(! is.na(Species)) %>% filter(! Species == "sp")
+
+Cano19_Length %>% select(Family, Genus, Species) %>% unique() %>% 
+  anti_join(Cano19_MaxN %>% select(Family, Genus, Species) %>% unique()) %>% 
+  filter(! is.na(Species)) %>% filter(! Species == "sp")
+
+Clip16_Length %>% select(Family, Genus, Species) %>% unique() %>% 
+  anti_join(Clip16_MaxN %>% select(Family, Genus, Species) %>% unique()) %>% 
+  filter(! is.na(Species)) %>% filter(! Species == "sp")
+
+Darwin16_Length %>% select(Family, Genus, Species) %>% unique() %>% 
+  anti_join(Darwin16_MaxN %>% select(Family, Genus, Species) %>% unique()) %>% 
+  filter(! is.na(Species)) %>% filter(! Species == "sp")
+
+Wolf16_Length %>% select(Family, Genus, Species) %>% unique() %>% 
+  anti_join(Wolf16_MaxN %>% select(Family, Genus, Species) %>% unique()) %>% 
+  filter(! is.na(Species)) %>% filter(! Species == "sp")
+
+GSF19_Length %>% select(Family, Genus, Species) %>% unique() %>% 
+  anti_join(GSF19_MaxN %>% select(Family, Genus, Species) %>% unique()) %>% 
+  filter(! is.na(Species)) %>% filter(! Species == "sp")
+
+PNM19_Length %>% select(Family, Genus, Species) %>% unique() %>% 
+  anti_join(PNM19_MaxN %>% select(Family, Genus, Species) %>% unique()) %>% 
+  filter(! is.na(Species)) %>% filter(! Species == "sp")
+
+Revilla16_Length %>% select(Family, Genus, Species) %>% unique() %>% 
+  anti_join(Revilla16_MaxN %>% select(Family, Genus, Species) %>% unique()) %>% 
+  filter(! is.na(Species)) %>% filter(! Species == "sp")
+
+Darwin17_Length %>% select(Family, Genus, Species) %>% unique() %>% 
+  anti_join(Darwin17_MaxN %>% select(Family, Genus, Species) %>% unique()) %>% 
+  filter(! is.na(Species)) %>% filter(! Species == "sp")
+
+Wolf17_Length %>% select(Family, Genus, Species) %>% unique() %>% 
+  anti_join(Wolf17_MaxN %>% select(Family, Genus, Species) %>% unique()) %>% 
+  filter(! is.na(Species)) %>% filter(! Species == "sp")
+
+#temporary data frame for missing species to Malpelo18 MaxN after checking the videos
+temp <- Malpelo18_Length %>% 
+  filter(Family == "Carcharhinidae" &	Genus == "Carcharhinus" & Species == "limbatus") %>% 
+  rbind(Malpelo18_Length %>% 
+          filter(Family == "Haemulidae" & Genus == "Haemulon" & Species == "sexfasciatum")) %>% 
+  select(5:11) %>% 
+  #ordering columns
+  select(1, 2, 7, everything()) %>% 
+  #renaming number to MaxN
+  rename("MaxN" = "Number")
+
+#Adding missing species to Malpelo18 MaxN after checking the videos
+Malpelo18_MaxN <- Malpelo18_MaxN %>% 
+  rbind(temp)
+
+#temporary data frame for missing species to Revilla16 MaxN after checking the videos
+temp <- Revilla16_Length %>% 
+  filter(Family == "Chaetodontidae" &	Genus == "Prognathodes" & Species == "falcifer") %>% 
+  rbind(Revilla16_Length %>% 
+          filter(Family == "Carcharhinidae" & Genus == "Carcharhinus" & Species == "obscurus")) %>% 
+  select(5:11) %>% 
+  #ordering columns
+  select(1, 2, 7, everything()) %>% 
+  #MaxN per site
+  group_by(Replicate, Species) %>% 
+  mutate(MaxN = sum(Number)) %>% 
+  unique() %>% 
+  #removing number
+  select(-Number) %>% 
+  ungroup()
+
+#Adding missing species to Revilla16 MaxN after checking the videos
+Revilla16_MaxN <- Revilla16_MaxN %>% 
+  rbind(temp)
+
+#removing temporary variable
+rm(temp)
+
+
+# Load supplementary data -------------------------------------------------
+
+#Loading MPA status and oceanic or coastal location of MPA
+MPA_status <- openxlsx::read.xlsx("Data/MPA_status.xlsx")
+
+#Site Info Clipperton
+SiteInfo <- openxlsx::read.xlsx("Data/SiteInfo.xlsx") %>% 
+  left_join(MPA_status, by = "Location")
+
+#Access to the Fish data set with correct names, Maximum length and Trophicl level
+FishDB <- openxlsx::read.xlsx("Data/FishDB_ETP.xlsx")
+#Database updated in May 2021
 
 #Vector containing names of non fish species
 NonFish <- c("Eretmochelys imbricata", "Chelonia mydas", "Zalophus wollebaeki", 
              "Phalacrocorax harrisi", "Cardisoma crassum", "Panulirus gracilis",
              "Scyllarides astori", "Spheniscus mendiculus", "Arctocephalus galapagoensis",
-             "Lepidochelys olivacea")
+             "Lepidochelys olivacea", "Cheloniidae sp", "Delphinidae sp")
 
 # Combining MaxN and Length datasets and cleaning data --------------------
 
 #Combining MaxN datasets
 MaxN <- Malpelo15_MaxN %>% 
   rbind(Malpelo18_MaxN) %>% 
-  rbind(Revillagigedo16_MaxN) %>% 
+  rbind(Revilla16_MaxN) %>% 
+  rbind(Clip16_MaxN) %>% 
+  rbind(PNM19_MaxN) %>% 
+  rbind(GSF19_MaxN) %>%
+  rbind(Cano19_MaxN) %>% 
+  rbind(Darwin16_MaxN) %>% 
+  rbind(Wolf16_MaxN) %>% 
+  rbind(Darwin17_MaxN) %>% 
+  rbind(Wolf17_MaxN) %>%
   #Recode sp1-4 to sp
   mutate(Species = recode(Species, 
                           "sp1" = "sp", 
@@ -172,19 +471,42 @@ MaxN <- Malpelo15_MaxN %>%
   #Remove columns with no family, genus, species, because they are sync points
   filter(!(is.na(Family) & is.na(Genus) & Species == "sp")) %>% 
   #Using join to keep correct names of species in DOVS data
-  left_join(FishDB %>% select(ScientificName, ValidName, a, b, LengthType, LenLenRatio),
+  left_join(FishDB %>% select(ScientificName, ValidName, MaxLgth_mm, TrophicLevel, Shark),
             by = c("SpeciesName" = "ScientificName")) %>% 
   #Now we remove non fish species
-  filter(!ValidName %in% NonFish) #4 Chelonia mydas removed
+  filter(!ValidName %in% NonFish) %>% #Chelonia mydas removed
+  #Recode misspelled Family name "Tetradontiadae" to "Tetraodontiadae"
+  mutate(Family = recode(Family, 
+                         "Tetradontiadae" = "Tetraodontiadae"))
 
-#Question - Do we keep these individuals?
-MaxN %>% select(Family, Genus, Species, SpeciesName) %>% arrange(Family, Genus, Species) %>% 
-  filter(Species == "sp") %>% unique()
+#temporary data frame for empty replicates
+temp <- SiteInfo %>% 
+  select(-c(Longitude, Latitude)) %>% 
+  anti_join(MaxN, by = c("Location", "Replicate"))
+
+#Keeping rows with highest MaxN for each species, duplicates due to species corrections
+MaxN <- MaxN %>% 
+  group_by(Replicate, ValidName) %>%
+  unique() %>% 
+  top_n(1, abs(MaxN)) %>% 
+  ungroup() %>% 
+  #Adding record_duration for replicates
+  left_join(SiteInfo %>% select(-c(Longitude, Latitude, MaxN)), by = c("Location", "Replicate")) %>% 
+  #Adding completely empty sites
+  bind_rows(temp)
 
 #Combining Length datasets
 Length <- Malpelo15_Length %>% 
   rbind(Malpelo18_Length) %>% 
-  rbind(Revillagigedo16_Length) %>% 
+  rbind(Revilla16_Length) %>% 
+  rbind(Clip16_Length) %>% 
+  rbind(PNM19_Length) %>% 
+  rbind(GSF19_Length) %>%
+  rbind(Cano19_Length) %>% 
+  rbind(Darwin16_Length) %>% 
+  rbind(Wolf16_Length) %>%
+  rbind(Darwin17_Length) %>% 
+  rbind(Wolf17_Length) %>%
   #Recode sp1-4 to sp
   mutate(Species = recode(Species, 
                           "sp1" = "sp", 
@@ -219,23 +541,23 @@ Length <- Malpelo15_Length %>%
                             "Zanclus sp" = "Zanclus cornutus", 
                             "Canthidermis sp" = "Canthidermis maculata")) %>% 
   #Using join to keep correct names of species
-  left_join(FishDB %>% select(ScientificName, ValidName, a, b, LengthType, LenLenRatio),
+  left_join(FishDB %>% select(ScientificName, ValidName, MaxLgth_mm, TrophicLevel, Shark),
             by = c("SpeciesName" = "ScientificName")) %>% 
   #Now we remove non fish species
   filter(!ValidName %in% NonFish) %>% #4 Chelonia mydas removed
   mutate(Length_mm = as.numeric(Length_mm)) #from character to numeric values
-  
-#Question - Do we keep these individuals?
-Length %>% select(Family, Genus, Species, SpeciesName) %>% arrange(Family, Genus, Species) %>% 
-  filter(endsWith(SpeciesName, "sp")) %>% unique()
 
-#Question - there are 24 unique genera measured where we do not have species name, should I use 
-#mean length for that genus instead? Or should we delete these from the biomass analysis?
+
+# Questions about MaxN and Length -----------------------------------------
+
+#Question - are all BRUVS from Malpelo 2018 bottom? Because they are NA values in the data, and Malpelo 2015 
+#did have pelagic BRUVS. So just double checking.
+
+#Question - there are 29 unique genera measured where we do not have species name, do we need these?
 Length %>% select(Family, Genus, Species, SpeciesName) %>% arrange(Family, Genus, Species) %>% 
          filter(endsWith(SpeciesName, "sp")) %>% unique() %>% count()
 
-#Question - there are 249 individuals which are only categorized to genus level, do we exclude them from
-#the biomass analysis? what about abundance?
+#Question - there are 270 individuals which are only categorized to genus level, do we need these?
 Length %>% select(Family, Genus, Species, SpeciesName) %>% arrange(Family, Genus, Species) %>% 
   filter(endsWith(SpeciesName, "sp")) %>% count()
 
@@ -245,123 +567,75 @@ Length %>% select(Family, Genus, Species, SpeciesName) %>% arrange(Family, Genus
 #Checking rows with value in SpeciesName but not in ValidName
 Length %>% select(SpeciesName, ValidName) %>% filter(is.na(ValidName)) %>% unique()
 
-#Loading Extra species to add to FishDB data
-NewFishDB <- openxlsx::read.xlsx("Data/NewSpecies_FishDB.xlsx")
-
-#Using join to keep correct names of species in data
-Length <- Length %>% 
-  left_join(NewFishDB %>% select(SpeciesName, ValidName_new, a_new, b_new, LengthType_new, LenLenRatio_new), 
-            by = c("SpeciesName" = "SpeciesName")) %>% 
-  #Combine validNames from old and new FishDB data in updated ValidName
-  mutate(ValidName_upd = coalesce(ValidName, ValidName_new)) %>% 
-  #Combine a from old and new FishDB data in updated a
-  mutate(a_upd = coalesce(a, a_new)) %>% 
-  #Combine b from old and new FishDB data in updated b
-  mutate(b_upd = coalesce(b, b_new)) %>% 
-  #Combine LengthType from old and new FishDB data in updated LengthType
-  mutate(LengthType_upd = coalesce(LengthType, LengthType_new)) %>% 
-  #Combine LenLenRatio from old and new FishDB data in updated LenLenRatio
-  mutate(LenLenRatio_upd = coalesce(as.numeric(LenLenRatio), LenLenRatio_new)) %>% 
-  #Removing former FishDB data to keep updated columns
-  select(-c(ValidName, ValidName_new, a, a_new, b, b_new, LengthType, LengthType_new, LenLenRatio, 
-            LenLenRatio_new)) %>% 
-  #Renaming columns to original names
-  rename(ValidName = ValidName_upd, 
-         a = a_upd, 
-         b = b_upd, 
-         LengthType = LengthType_upd, 
-         LenLenRatio = LenLenRatio_upd)
-
-#Checking
-Length %>% select(SpeciesName, ValidName, a, b, LengthType, LenLenRatio) %>% 
-  filter(is.na(a)) %>% unique()
-
-
-MaxN %>% select(Family, Genus, Species) %>% filter(Species == "sp") %>% unique()
-#Carcharhinidae Carcharhinus      sp - 13 species
-#Kyphosidae     Kyphosus      sp - 5 species
-#Carangidae         <NA>      sp - 35 species
-#Carangidae       Caranx      sp - 6 species
-#Lutjanidae     Lutjanus      sp - 9 species
-
-Length %>% select(Family, Genus, Species) %>% filter(Species == "sp") %>% unique()
-#Labridae   Halichoeres      sp - 12 species
-#Carcharhinidae  Carcharhinus      sp - 13 species
-#Lutjanidae          <NA>      sp - 12 species
-#Lutjanidae     Lutjanus      sp - 9 species
-#Carangidae       Caranx      sp - 6 species
-#Carangidae         <NA>      sp - 35 species
-#Tripterygiidae  Lepidonectes      sp - 3 species
-#Balistidae  Xanthichthys      sp - 2 species
-#Acanthuridae    Acanthurus      sp - 5 species
-#Serranidae  Dermatolepis      sp - 1 species: Dermatolepis dermatolepis
-#Dasyatididae      Dasyatis      sp - 2 species
-#Carcharhinidae    Triaenodon      sp - 1 species: Triaenodon obesus
-#Balistidae      Balistes      sp - 1 species: Balistes polylepis
-#Haemulidae   Anisotremus      sp - 4 species
-#Carangidae       Seriola      sp - 3 species
-#Balistidae     Sufflamen      sp - 1 species: Sufflamen verres
-#Serranidae   Epinephelus      sp - 5 species
-#Chaetodontidae    Forcipiger      sp - 1 species: Forcipiger flavissimus
-#Acanthuridae     Prionurus      sp - 2 species
-#Pomacanthidae   Holacanthus      sp - 3 species
-#Serranidae    Paranthias      sp - 1 species: Paranthias colonus
-#Mobulidae         Manta      sp - 1 species: Manta birostris
-#Kyphosidae     Kyphosus      sp - 5 species
-#Chaetodontidae Johnrandallia      sp - 1 species: Johnrandallia nigrirostris
-#Tetradontiadae      Arothron      sp - 3 species
-#Monocanthidae      Aluterus      sp - 2 species
-#Labridae    Thalassoma      sp - 5 species
-#Scaridae        Scarus      sp - 4 species
-#Labridae      Bodianus      sp - 2 species
-#Fistulariidae    Fistularia      sp - 2 species
-#Aulostomidae    Aulostomus      sp - 1 species: Aulostomus chinensis
-#Zanclidae       Zanclus      sp - 1 species: Zanclus cornutus
-#Ophichthidae   Quassiremus      sp - 2 species
-#Serranidae Cephalopholis      sp - 2 species
-#Balistidae  Canthidermis      sp - 1 species: Canthidermis maculata
-
-#Question: should I check for individual sites e.g. Malpelo to see if only one species is present in
-#that area?
-
-#There are only one species present within the ETP for the following 11 Genera: 
-#Dermatolepis - Dermatolepis dermatolepis 
-#Triaenodon - Triaenodon obesus 
-#Balistes - Balistes polylepis
-#Sufflamen - Sufflamen verres 
-#Forcipiger - Forcipiger flavissimus 
-#Paranthias - Paranthias colonus
-#Manta - Manta birostris 
-#Johnrandallia - Johnrandallia nigrirostris
-#Aulostomus - Aulostomus chinensis
-#Zanclus - Zanclus cornutus
-#Canthidermis - Canthidermis maculata
-
-
-
-# Environmental data ------------------------------------------------------
-
-#Environmental variables for sites
-EnvVar <- Malpelo15_MaxN %>% 
-  select("Location", "Site", "Depth", "Comment", "BRUVS_type", "Record_duration", 
-         "SST", "Bottom_type") %>% 
-  unique() %>% 
-  rbind(Malpelo18_MaxN %>% 
-          select("Location", "Site", "Depth", "Comment", "BRUVS_type", "Record_duration", 
-                 "SST", "Bottom_type") %>% 
-          unique()) %>% 
-  rbind(Revillagigedo16_MaxN %>% 
-          select("Location", "Site", "Depth", "Comment", "BRUVS_type", "Record_duration", 
-                 "SST", "Bottom_type") %>% 
-          unique()) %>% 
-  #Removing double site from Malpelo18 with NA for depth
-  filter(! (Site == "Bahia Junior" & is.na(Depth)))
-#Question - Bahia Junior in Malpelo18 has two depths, NA and 25, should the NA entry be deleted?
-#Question - in Revillagigedo, some of the samples have the same site names, but different values for
-#environmental variables --> replicate site names?! 
+#Cheking what species are in the data, but not in the FishDB
+MaxN %>% select(Family, Genus, Species, SpeciesName, ValidName) %>% filter(is.na(ValidName)) %>% unique()
   
 
 #Remove unnecessary variables
-rm(Malpelo15_MaxN, Malpelo15_Length, Malpelo18_MaxN, Malpelo18_Length, Revillagigedo16_MaxN, 
-   Revillagigedo16_Length)
+rm(Malpelo15_MaxN, Malpelo15_Length, Malpelo18_MaxN, Malpelo18_Length, Revilla16_MaxN, 
+   Revilla16_Length, Clip16_MaxN, Clip16_Length, PNM19_MaxN, PNM19_Length, GSF19_MaxN, 
+   GSF19_Length, Cano19_MaxN, Cano19_Length, Darwin16_MaxN, Darwin16_Length, Wolf16_MaxN, 
+   Wolf16_Length, Darwin17_MaxN, Darwin17_Length, Wolf17_MaxN, Wolf17_Length)
 
+
+# Splitting data into trophic levels --------------------------------------
+
+#Small predators
+Small <- MaxN %>%
+  filter(TrophicLevel >= 3.75) %>% 
+  filter(MaxLgth_mm < 300)
+
+#Predatory fishes and sharks, trophic category Carnivore and apex predators
+Predators <- MaxN %>%
+  filter(TrophicLevel >= 3.75) %>% 
+  anti_join(Small)
+
+#Fish community
+FishCom <- MaxN %>% 
+  filter(TrophicLevel < 3.75) %>% 
+  bind_rows(Small)
+
+#Sharks
+Sharks <- MaxN %>%
+  filter(Shark == "Shark")
+
+#Fish missing from the FishDB
+MissingFish <- MaxN %>% 
+  filter(is.na(TrophicLevel))
+#Question - note to self: These are individuals identified to Family or Genus level
+
+#Remove unnecessary variables
+rm(MissingFish, Small)
+
+
+# Adding empty sites ------------------------------------------------------
+
+
+#temporary data frame with sites empty for fish with trophic level < 3.75
+temp <- SiteInfo %>% 
+  select(-c(Latitude, Longitude)) %>% 
+  anti_join(FishCom, by = c("Location", "Replicate"))
+
+#Adding sites empty for fish with trophic level < 3.75
+FishCom <- FishCom %>% 
+  bind_rows(temp)
+
+#temporary data frame with sites empty for predators
+temp <- SiteInfo %>% 
+  select(-c(Latitude, Longitude)) %>% 
+  anti_join(Predators, by = c("Location", "Replicate"))
+
+#Adding sites empty for predators
+Predators <- Predators %>% 
+  bind_rows(temp)
+
+#temporary data frame with sites empty for sharks
+temp <- SiteInfo %>% 
+  select(-c(Latitude, Longitude)) %>% 
+  anti_join(Sharks, by = c("Location", "Replicate"))
+
+#Adding sites empty for sharks
+Sharks <- Sharks %>% 
+  bind_rows(temp)
+
+rm(temp)
