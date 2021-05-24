@@ -1,0 +1,330 @@
+
+#Making non-shark matrix
+NotSharks <- MaxN %>% 
+  filter(Shark != "Shark" | is.na(Shark)) #Simply add to include NA cells to avoid joins
+
+
+#Calculating MaxN per hour for each of the replicates and for species per replicate
+MaxN_NotSharks <- NotSharks %>% 
+  #Removing unnecessary columns
+  select(!c(Site:Species, SpeciesName, MaxLgth_mm, Shark)) %>% 
+  #calculating Record_duration in hours
+  mutate(Record_duration_hrs = Record_duration/60) %>% 
+  #MaxN per hour column
+  mutate(MaxN_sp = MaxN/Record_duration_hrs)
+  
+#I do not understand why this section has so many calculations - What is all this about? - DFA
+#Why are you not using the summarise option. It is hard to follow what is happening here - DFA
+
+# Loading libraries -------------------------------------------------------
+
+{library(tidyverse)
+  library(vegan)
+  # library(ape) #For principal coordinates analysis
+  library(RColorBrewer)
+  library(ggrepel)
+  library(ggordiplots)
+}
+
+
+# PCO plot for MaxNFish ----------------------------------------------------
+
+#Finding dummy value - What is this about? It is immediately deleted - DFA
+temp <- MaxN_NotSharks %>% 
+  select(Location, Replicate, ValidName, MaxN_sp)
+#this shows the smallest value of MaxN which will also be the value for the dummy species
+
+rm(temp)
+
+#Making Matrix for MaxNFish of species
+MaxN_mat <- MaxN_NotSharks %>% 
+  select(Replicate, ValidName, Location, MaxN_sp) %>% 
+  #Using only unique values of MaxNFish per species per Replicate
+  unique() %>%
+  #Adding the Location to the Replicate name (I split them later for the plot) - Why are you doing this? - DFA
+  #The Location code already contains the location name - DFA
+  #This is to make sure I have unique replicate names and keep the location information
+  unite(RepLoc, Replicate, Location, sep = ":") %>%
+  #Making the format right for the matrix
+  pivot_wider(names_from = "ValidName", values_from = "MaxN_sp") %>% #Making the format right for the matrix
+  #Adding dummy species to all sites, to enable dissimilarity calculations for empty sites
+  mutate(Dummy = 0.66) %>% #Where has this number come from?
+  #removing NA value for areas with no species
+  select(!"NA") %>% 
+  arrange(RepLoc) %>% #Arranging Replicate names
+  column_to_rownames("RepLoc") %>% #Making a column into row names for the matrix
+  as.matrix() %>% 
+  replace_na(0) #Putting 0 instead of NA, when the species was not observed at the Replicate.
+
+#Checking ranges for transformations and no transformation
+range(MaxN_mat)
+range(MaxN_mat^0.5)
+range(MaxN_mat^0.25)
+
+#Applying a square root transformation to matrix
+MaxN_mat <- MaxN_mat^0.5
+
+#Calculating dissimilarity distance using vegan package, the default is Bray Curtis
+MaxN_mat_dist <- vegdist(MaxN_mat, method = "bray")
+
+#Create a PCoA (Principal Co-ordinates Analysis) plot
+#returns matrix of scores scaled by eigenvalues
+MaxN_mat_pco <- wcmdscale(MaxN_mat_dist, eig = TRUE, add = "lingoes") 
+#Show plot
+plot(MaxN_mat_pco, type = "points") #Add type points to remove labels
+
+#binding PCO coordinates to dataframe
+PCO_MaxNFish <- as.data.frame(MaxN_mat_pco$points[,1:2]) %>% 
+  rownames_to_column("Replicate") %>% 
+  separate(Replicate, c("Replicate", "Location"), sep = ":") %>% 
+  rename(PCO1 = Dim1, PCO2 = Dim2) %>% 
+  left_join(SiteInfo %>% select(-c(3:6)), by = c("Location", "Replicate"))
+
+
+# Pearson Correlation MaxNFish PCO wcmdscale -----------------------------------------
+
+#Richness of sharks to add to envfit
+Ric <- RicSharks %>% 
+  select(Replicate, Location, Ric_rep_hr) %>% 
+  group_by(Replicate, Location) %>% 
+  arrange(Replicate)
+
+#MaxN of sharks to add to envfit
+N <- MaxNSharks %>% 
+  select(Replicate, Location, MaxN_rep) %>% 
+  group_by(Replicate, Location) %>% 
+  arrange(Replicate) %>% 
+  unique() %>% 
+  #transforming data similarly to species matrix
+  mutate(MaxN_rep = MaxN_rep^0.5)
+
+#Variables and species to check for correlation with axes
+SpVar <- MaxN_mat %>% 
+  cbind(Ric_rep = Ric$Ric_rep_hr) %>% 
+  cbind(MaxN_rep = N$MaxN_rep)
+
+#We extract scores from PCoA and calculate correlation with matrix
+SpCorr <- envfit(MaxN_mat_pco$points, SpVar, permutations = 9999)
+#Check out the scores to each dimension from the correlation calculated above 
+scores(SpCorr, "vectors")
+#Plot your PCoA
+plot(MaxN_mat_pco$points, type = "p")
+#Overlay species which have significant correlation (p <= 0.05)
+plot(SpCorr, p.max = 0.05, col = "red")
+#You can check the actual correlation coefficients (Pearson) using the line below
+SpCorr$vectors$r
+
+#correlation values in data frame
+temp <- as.data.frame(SpCorr$vectors$r) %>% 
+  #Rename column
+  rename("r" = `SpCorr$vectors$r`) %>% 
+  #Making species into column
+  rownames_to_column(., var = "Species") %>% 
+  #Remove species with correlation below 0.5
+  filter(r > 0.6 | Species == "MaxN_rep" | Species == "Ric_rep")
+
+#Making character vector of species names for correlated species
+Corr_species <- as.vector(temp$Species)
+
+#Making character vector of short species names
+Corr_short <- temp %>% 
+  mutate(Genus = substr(Species, 1, 1)) %>% 
+  mutate(Sp = word(Species, -1)) %>% 
+  unite(Short_sp, Genus, Sp, sep = ". ")
+
+#Remove unnecessary variable
+rm(SpCorr, temp)
+
+#####################################################
+#I cannot see where the shark data is being correlated with the fish assemblages
+#If you see Figure 7 in David's 2018 paper, you can see that he has two red dotted lines
+#One labeled Log(N+1) which refers to the total log-abundance of (all) shark species
+#and the other one labeled S which refers to the species richness of sharks only
+#If you want to do this analysis, you need to perform the above calculations on shark
+#data only and then correlate these values to the PCoA using something envfit.
+#The first full paragraph in page 8 (labelled 80 in the pdf) includes more details on
+#how this analysis was done. - DFA
+#####################################################
+#Now I have added the Shark MaxN and richness to the envfit in line 107
+#I am preparing the data in the lines above that from 86 to 104.
+#Is it the correct way I am doing things now?
+#####################################################
+
+
+# PCO MaxNFish with arrows -------------------------------------------------
+#Function that computes arrows from a pcoa and a species matrix
+compute_arrows <-  function(MaxN_mat_pco, SpVar) {
+  
+  # Keeping the species that has the largest arrows (from former PCO plot)
+  SpVar = SpVar[ , Corr_species]
+  
+  n <- nrow(SpVar)
+  points.stand <- scale(MaxN_mat_pco$points)
+  
+  # Compute covariance of variables with all axes
+  S <- cov(SpVar, points.stand)
+  
+  # Select only positive eigenvalues
+  pos_eigen = MaxN_mat_pco$eig[seq(ncol(S))]
+  
+  # Standardize value of covariance (see Legendre & Legendre 1998)
+  U <- S %*% diag((pos_eigen/(n - 1))^(-0.5))
+  colnames(U) <- colnames(MaxN_mat_pco$points)
+  
+  # Add values of covariances inside object
+  MaxN_mat_pco$U <- U
+  
+  return(MaxN_mat_pco)
+}
+
+#computing arrows for species using the function compute_arrows
+species_pco_arrows <- compute_arrows(MaxN_mat_pco, SpVar)
+#changing points to data.frame before putting it in ggplot2
+species_pco_arrows$points <- as.data.frame(species_pco_arrows$points)
+
+#making arrows smaller, so they fit better in the PCO
+arrows_df <- as.data.frame(species_pco_arrows$U/20)
+arrows_df$variable <- rownames(arrows_df)
+
+#Naming arrows with short species names
+arrows_df$variable <- Corr_short$Short_sp
+
+
+# PCO plot MaxNFish ----------------------------------------------------------------
+
+#Making an anchor for the arrows
+Anchor <- c(0.53, 0.4)
+
+#Constant adjusting the size of vectors
+K <- 1 #not actually necessary, as it is currently 1, but good for playing around with the code
+
+#define other coordinates for arrows
+X2 <- (arrows_df$Dim1 + Anchor[1])*K
+Y2 <- (arrows_df$Dim2 + Anchor[2])*K
+
+ordi <- gg_ordiplot(MaxN_mat_pco, groups = PCO_MaxNFish$Location, kind = "sd")
+
+PCO_MaxNFish$Protection_status <- factor(PCO_MaxNFish$Protection_status, levels = c("Low", "Medium", "High"))
+
+#Plotting biomass, method, fishing and arrows for species with largest biomass
+PCO_MaxN7 <- ggplot(PCO_MaxNFish) + 
+  #Adding color and shapes # shape = Zone, can be added when I have zonation ready
+  geom_point(aes(PCO1, PCO2, color = Location, shape = Protection_status), stroke = 2, size = 4.5) + 
+  scale_color_brewer(palette = "Dark2") +
+  scale_shape_manual(values = c(4, 2, 5)) +
+  geom_path(data = ordi$df_ellipse, aes(x = x, y = y, colour = Group), size = 1) +
+  guides(color = guide_legend(order = 1, title = "MPA"),
+         shape = guide_legend(order = 2, title = "Status")) +
+  geom_segment(data = arrows_df, #Adding arrows
+               x = Anchor[1], y = Anchor[2],
+               mapping = aes(xend = X2, yend = Y2),
+               arrow = arrow(length = unit(2, "mm")), #Adding arrow head
+               size = 0.8) +
+  #Adding arrow labels
+  geom_text_repel(data = arrows_df, aes(label = variable),
+                  size = 7, fontface = "italic",
+                  lineheight = 0.6,
+                  x = X2, y = Y2,
+                  box.padding = 0.5) +
+  theme_classic() +
+  #Adding percentages for the PCO axes
+  xlab(paste0("PCO1 (", 
+              as.character(as.numeric(format(round(MaxN_mat_pco$eig[1]/sum(MaxN_mat_pco$eig), 3)))*100), 
+              "% of total variation)")) +
+  ylab(paste0("PCO2 (", 
+              as.character(as.numeric(format(round(MaxN_mat_pco$eig[2]/sum(MaxN_mat_pco$eig), 3)))*100), 
+              "% of total variation)")) +
+  # scale_x_continuous(breaks = seq(-0.5, 0.5, by = 0.25), limits = c(-0.55, 0.60)) +
+  # scale_y_continuous(breaks = seq(-0.5, 0.5, by = 0.25), limits = c(-0.55, 0.55)) +
+  #moving legend in plot and making box around it
+  theme(legend.position = "none", #c(0.9, 0.33), 
+        legend.box.background = element_rect(size = 0.7, linetype = "solid", colour ="black"), 
+        legend.box.margin = margin(0.1, 0.1, 0.1, 0.1, "cm"),
+        legend.title = element_text(color = "black", size = 23),
+        legend.text = element_text(color = "black", size = 21),
+        axis.text.x = element_text(color = "black", size = 23), 
+        axis.text.y = element_text(color = "black", size = 23), 
+        axis.title.x = element_text(color = "black", size = 25),
+        axis.title.y = element_text(color = "black", size = 25), 
+        axis.line.x = element_line(color = "black", size = 1), 
+        axis.line.y = element_line(color = "black", size = 1), 
+        axis.ticks = element_line(color = "black", size = 1.2), 
+        axis.ticks.length = unit(0.2, "cm"))
+
+PCO_MaxN7
+
+#Saving PCO for biomass - method and management status
+# ggsave("../Figures/PCO_bio_method_fishing.tiff", 
+#        PCO_bio_1, device = "tiff", dpi = 300, width = 11, height = 10)
+
+
+# PCO plot Coastal_Oceanic ------------------------------------------------
+
+#Plotting biomass, method, fishing and arrows for species with largest biomass
+PCO_MaxN8 <- ggplot(PCO_MaxNFish) + 
+  #Adding color and shapes # shape = Zone, can be added when I have zonation ready
+  geom_point(aes(PCO1, PCO2, color = Location, shape = Coastal_Oceanic), stroke = 2, size = 4.5) + 
+  scale_color_brewer(palette = "Dark2") +
+  scale_shape_manual(values = c(4, 2)) +
+  geom_path(data = ordi$df_ellipse, aes(x = x, y = y, colour = Group), size = 1) +
+  guides(color = guide_legend(order = 1, title = "MPA"),
+         shape = guide_legend(order = 2, title = "Status")) +
+  geom_segment(data = arrows_df, #Adding arrows
+               x = Anchor[1], y = Anchor[2],
+               mapping = aes(xend = X2, yend = Y2),
+               arrow = arrow(length = unit(2, "mm")), #Adding arrow head
+               size = 0.8) +
+  #Adding arrow labels
+  geom_text_repel(data = arrows_df, aes(label = variable),
+                  size = 7, fontface = "italic",
+                  lineheight = 0.6,
+                  x = X2, y = Y2,
+                  box.padding = 0.5) +
+  theme_classic() +
+  #Adding percentages for the PCO axes
+  xlab(paste0("PCO1 (", 
+              as.character(as.numeric(format(round(MaxN_mat_pco$eig[1]/sum(MaxN_mat_pco$eig), 3)))*100), 
+              "% of total variation)")) +
+  ylab(paste0("PCO2 (", 
+              as.character(as.numeric(format(round(MaxN_mat_pco$eig[2]/sum(MaxN_mat_pco$eig), 3)))*100), 
+              "% of total variation)")) +
+  scale_x_continuous(breaks = seq(-0.5, 0.5, by = 0.25), limits = c(-0.55, 0.60)) +
+  scale_y_continuous(breaks = seq(-0.5, 0.5, by = 0.25), limits = c(-0.55, 0.55)) +
+  #moving legend in plot and making box around it
+  theme(legend.position = c(0.9, 0.33), 
+        legend.box.background = element_rect(size = 0.7, linetype = "solid", colour ="black"), 
+        legend.box.margin = margin(0.1, 0.1, 0.1, 0.1, "cm"),
+        legend.title = element_text(color = "black", size = 23),
+        legend.text = element_text(color = "black", size = 21),
+        axis.text.x = element_text(color = "black", size = 23), 
+        axis.text.y = element_text(color = "black", size = 23), 
+        axis.title.x = element_text(color = "black", size = 25),
+        axis.title.y = element_text(color = "black", size = 25), 
+        axis.line.x = element_line(color = "black", size = 1), 
+        axis.line.y = element_line(color = "black", size = 1), 
+        axis.ticks = element_line(color = "black", size = 1.2), 
+        axis.ticks.length = unit(0.2, "cm"))
+
+PCO_MaxN8
+
+Plot7_8 <- ggarrange(PCO_MaxN7, NULL, PCO_MaxN8, widths = c(1, 0.1, 1), nrow = 1)
+
+Plot7_8
+
+#Saving PCO for biomass - method and management status
+ggsave("Figures/PCO_NotSharks.tiff",
+       Plot7_8, device = "tiff", dpi = 300, width = 21, height = 10)
+
+
+# Data from Fish Community ------------------------------------------------
+
+PCO_NotSharks <- PCO_MaxNFish
+
+Mat_NotSharks <- MaxN_mat
+
+Dist_NotSharks <- MaxN_mat_dist
+
+
+#Remove unnecessary variables
+rm(MaxN_mat_pco, PCO_MaxNFish, species_pco_arrows, Anchor, 
+   Corr_species, Corr_short, K, X2, Y2, compute_arrows, arrows_df, hull_MaxN, ordi)
