@@ -138,6 +138,9 @@ SpVar <- MaxN_mat %>%
 SpCorr <- envfit(MaxN_cap$PCoA, data.frame(Ric_rep = Ric$Ric_rep_hr, MaxN_rep = N$MaxN_rep), permutations = 999)
 #Now you do not get warnings of things potentially going wrong. It is really important you read warnings and errors
 #to ensure you are getting results that make sense. - DFA
+#It just occurred to me that you may have wanted to also correlate the other fish abundances too, similar to a SIMPER
+#analysis, then I guess this could also work, although you may want to do some digging online to find out if this is 
+#a good approach. - DFA
 
 #Check out the scores to each dimension from the correlation calculated above 
 scores(SpCorr, "vectors") #Now you get two scores only, which makes sense and it is exactly what you wanted - DFA
