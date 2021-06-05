@@ -246,16 +246,19 @@ P4
 RicSharks <- Sharks %>% 
   #Selecting columns to be used
   select(Replicate, ValidName, MaxN, Location, Record_duration) %>%
-  #Recode NA in Record_duration to 90 min
+  #Recode NA in Record_duration to 90 min - Are we sure they are meant to be 90 minutes in length? - DFA
   mutate(Record_duration = replace_na(Record_duration, 90)) %>% 
   #calculating column with number of hours
   mutate(hours = Record_duration/60) %>% 
   #group by site
   group_by(Replicate) %>% 
   #Calculating richness per site
-  mutate(Richness_rep = length(unique(na.omit(ValidName)))) %>%
-  #Calculating richness per site
-  mutate(Ric_rep_hr = length(unique(na.omit(ValidName)))/hours) %>%
+  # mutate(Richness_rep = length(unique(na.omit(ValidName)))) %>%
+  mutate(Richness_rep = n(), #n() counts rows based on groups defined under group_by()
+        #Calculating richness per site
+         Ric_rep_hr = Richness_rep/hours) %>% 
+  # mutate(Ric_rep_hr = length(unique(na.omit(ValidName)))/hours) %>% #there is no need to use mutate twice
+  #or to calculate the same value twice, just use the column previously created - DFA
   #group by location
   group_by(Location) %>% 
   #Calculating Total richness per location

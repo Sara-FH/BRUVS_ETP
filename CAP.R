@@ -1,4 +1,8 @@
 
+#It is not a good idea to call a variable that has been produced by another script without providing
+#some sort of description of where it is coming from. You have a lot of scripts and in a few months
+#you may not remember what the workflow should be since the scripts are not all numbered - DFA
+
 #Making non-shark matrix
 NotSharks <- MaxN %>% 
   filter(Shark != "Shark" | is.na(Shark)) #Simply add to include NA cells to avoid joins
@@ -50,7 +54,7 @@ MaxN_mat <- MaxN_NotSharks %>%
   #Adding dummy species to all sites, to enable dissimilarity calculations for empty sites
   mutate(Dummy = 0.66) %>% #Where has this number come from?
   #removing NA value for areas with no species
-  select(!"NA") %>% 
+  select(!"NA") %>%
   arrange(RepLoc) %>% #Arranging Replicate names
   column_to_rownames("RepLoc") %>% #Making a column into row names for the matrix
   as.matrix() %>% 
@@ -65,7 +69,8 @@ range(MaxN_mat^0.25)
 MaxN_mat <- MaxN_mat^0.5
 
 #Calculating dissimilarity distance using vegan package, the default is Bray Curtis
-# MaxN_mat_dist <- vegdist(MaxN_mat, method = "bray")
+MaxN_mat_dist <- vegdist(MaxN_mat, method = "bray") #This was commented out,
+#Without this line, the chunk below does not work and nothing else in the script - DFA
 # 
 # library(BiodiversityR)
 
@@ -97,36 +102,53 @@ CAP <- as.data.frame(MaxN_cap$PCoA[,1:2]) %>%
 
 # Pearson Correlation MaxNFish PCO wcmdscale -----------------------------------------
 
-#Richness of sharks to add to envfit
-Ric <- RicSharks %>%
+#Richness of sharks to add to envfit 
+Ric <- RicSharks %>% #As above, where is this variable coming from? - DFA
   select(Replicate, Location, Ric_rep_hr) %>%
   group_by(Replicate, Location) %>%
   arrange(Replicate)
 
 #MaxN of sharks to add to envfit
-N <- MaxNSharks %>%
+N <- MaxNSharks %>% #Again, where is this coming from? - DFA
   select(Replicate, Location, MaxN_rep) %>%
   group_by(Replicate, Location) %>%
   arrange(Replicate) %>%
   unique() %>%
   #transforming data similarly to species matrix
-  mutate(MaxN_rep = MaxN_rep^0.5)
+  mutate(MaxN_rep = MaxN_rep^0.5) #Why are you doing this? What similarity matrix are you referring to? - DFA
 
 #Variables and species to check for correlation with axes
+#I do not understand why this is being done? Why are you joining this to a matrix? - DFA
 SpVar <- MaxN_mat %>%
   cbind(Ric_rep = Ric$Ric_rep_hr) %>%
   cbind(MaxN_rep = N$MaxN_rep)
 
 #We extract scores from PCoA and calculate correlation with matrix
-SpCorr <- envfit(MaxN_cap$PCoA, SpVar, permutations = 999)
+# SpCorr <- envfit(MaxN_cap$PCoA, SpVar, permutations = 999) #I am not sure why you are using a matrix here that
+#contains information that is not relevant for the analysis. You are essentially correlating the data you used
+#to create the PCoA. I do not understand what you are trying to achieve here. - DFA
+#The rows in your email and code do not match so I will assume this is the shark correlation. I recommend you
+#take some time to read more about the help section of the envfit function so you understand how it works.
+#You got a lot of warnings after running the line above, so it is worth you read these to understand the outputs
+#you are getting. What you want to do is correlate total log-abundance of (all) shark species and the species 
+#richness of sharks only with the rest of the assemblage (I have said this before but you really need to read the
+#methods in David's paper, it is all explained there. 
+#You simply need you ordination results and the shark factors (abundance and species richness) to calculate the
+#correlations. Any other data is irrelevant here. - DFA
+SpCorr <- envfit(MaxN_cap$PCoA, data.frame(Ric_rep = Ric$Ric_rep_hr, MaxN_rep = N$MaxN_rep), permutations = 999)
+#Now you do not get warnings of things potentially going wrong. It is really important you read warnings and errors
+#to ensure you are getting results that make sense. - DFA
+
 #Check out the scores to each dimension from the correlation calculated above 
-scores(SpCorr, "vectors")
+scores(SpCorr, "vectors") #Now you get two scores only, which makes sense and it is exactly what you wanted - DFA
 #Plot your PCoA
 plot(MaxN_cap$PCoA, type = "p")
 #Overlay species which have significant correlation (p <= 0.05)
 plot(SpCorr, p.max = 0.05, col = "red")
 #You can check the actual correlation coefficients (Pearson) using the line below
 SpCorr$vectors$r
+#The result is that these correlations are both significant, but species richness has a low correlation (~0.27) and
+#MaxN has a medium association (~0.55) - DFA
 
 #correlation values in data frame
 temp <- as.data.frame(SpCorr$vectors$r) %>% 
